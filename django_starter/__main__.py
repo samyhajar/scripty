@@ -1,12 +1,10 @@
-# File: django_starter/__main__.py
-
 import sys
 from pathlib import Path
 from . import (
     BaseInstaller,
     DjangoInstaller,
     TailwindInstaller,
-    UnfoldInstaller,  # Import the UnfoldInstaller
+    UnfoldInstaller,
     BaseTemplateCreator,
     AppTemplateCreator,
 )
@@ -21,10 +19,9 @@ def main():
         # Cleanup previous projects
         base_installer.cleanup()
 
-        # Get project and app names first
+        # Get project name
         django_installer = DjangoInstaller()
         project_name = django_installer.get_project_name()
-        app_name = django_installer.get_main_app_name()
 
         # Setup project directory
         project_dir = base_installer.setup_project_directory(project_name)
@@ -40,16 +37,16 @@ def main():
         template_creator = BaseTemplateCreator(project_name)
         template_creator.create_base_templates()
 
-        # Create main app and additional apps
+        # Create main app (home) and additional apps
         app_creator = AppTemplateCreator(project_name)
-        created_apps = app_creator.create_apps(main_app=app_name)
+        created_apps = app_creator.create_apps()  # No need to pass main_app anymore
 
         # Install and configure Unfold
-        unfold_installer = UnfoldInstaller(project_name, app_name)  # Pass both project_name and app_name
+        unfold_installer = UnfoldInstaller(project_name)  # Only pass project_name
         unfold_installer.install()
 
         # Set up URL routing
-        django_installer.configure_main_app_routing(app_name)
+        django_installer.configure_main_app_routing()  # No parameter needed
 
         # Run initial setup
         django_installer.run_initial_setup()

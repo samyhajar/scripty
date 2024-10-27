@@ -6,8 +6,18 @@ setup(
     packages=find_packages(),
     python_requires=">=3.8",
     install_requires=[
-        "django>=4.0",
-        "django-tailwind[reload]>=3.0",
+        "django",
+        "django-tailwind[reload]",
+        "django-browser-reload",
+        "django-unfold",
+        "pick",  # Changed from python-inquirer to pick
+        "python-dotenv",
+        "whitenoise",
+        "pillow",
+        "psycopg2-binary",
+        "gunicorn",
+        "requests",
+        "rich",
     ],
     entry_points={
         "console_scripts": [

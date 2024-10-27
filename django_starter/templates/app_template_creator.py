@@ -1,38 +1,54 @@
-# File: django_starter/templates/app_template_creator.py
-
 import sys
 import subprocess
 from pathlib import Path
+from .template_generators.admin_templates import get_admin_template
+from .template_generators.view_templates import get_views_template
+from .template_generators.model_templates import get_models_template
+from .template_generators.url_templates import get_urls_template
+from .template_generators.html_templates import (
+    get_main_index_template,
+    get_index_template,
+    get_about_template
+)
 
 class AppTemplateCreator:
     def __init__(self, project_name):
         self.base_dir = Path.cwd()
         self.project_name = project_name
         self.created_apps = []
+        self.main_app = 'home'  # Fixed main app name
 
-    def create_apps(self, main_app):
+    def create_apps(self):
         """Create main app and additional apps."""
-        # Create main app first
-        print(f"\nCreating main app: {main_app}")
-        self.created_apps.append(main_app)
-        self._create_app(main_app, is_main=True)
+        # Create main app (home) first
+        print(f"\nCreating main app: {self.main_app}")
+        self.created_apps.append(self.main_app)
+        self._create_app(self.main_app, is_main=True)
 
-        # Create additional apps
-        print("\nEnter additional app names (separated by spaces), or press Enter to skip:")
-        apps_input = input().strip()
+        # Create required apps (clients and orders)
+        required_apps = ['clients', 'orders']
+        for app_name in required_apps:
+            self.created_apps.append(app_name)
+            print(f"\nCreating app: {app_name}")
+            self._create_app(app_name, is_main=False)
 
-        if apps_input:
-            app_names = [app.strip() for app in apps_input.split()]
-            for app_name in app_names:
-                if app_name.isidentifier() and app_name != main_app:
-                    self.created_apps.append(app_name)
-                    print(f"\nCreating app: {app_name}")
-                    self._create_app(app_name, is_main=False)
-                else:
-                    print(f"Skipping invalid app name: {app_name}")
+        # Ask for additional apps
+        while True:
+            additional_app = input("\nEnter additional app name (or press Enter to finish): ").strip().lower()
+            if not additional_app:
+                break
+            if additional_app in self.created_apps:
+                print(f"App {additional_app} already exists. Please enter a different name.")
+                continue
+            if additional_app in ['admin', 'auth', 'contenttypes', 'sessions']:
+                print(f"Cannot create app named {additional_app} as it conflicts with Django's internal apps.")
+                continue
+            self.created_apps.append(additional_app)
+            print(f"\nCreating app: {additional_app}")
+            self._create_app(additional_app, is_main=False)
 
         self._update_settings_with_apps()
-        self._update_main_urls(main_app)
+        self._update_main_urls()
         print("\nAll apps created successfully!")
         return self.created_apps
 
@@ -51,19 +67,31 @@ class AppTemplateCreator:
 
         # Create urls.py
         with open(app_dir / "urls.py", "w") as file:
-            file.write(self._get_urls_template(app_name))
+            file.write(get_urls_template(app_name))
 
         # Create views.py
         with open(app_dir / "views.py", "w") as file:
-            file.write(self._get_views_template(app_name, is_main))
+            file.write(get_views_template(app_name, self.project_name, is_main))
 
         # Create models.py
         with open(app_dir / "models.py", "w") as file:
-            file.write(self._get_models_template(app_name))
+            file.write(get_models_template(app_name))
 
-        # Create admin.py
+        # Create admin.py with appropriate configurations
+        list_display = self._get_list_display(app_name)
+        search_fields = self._get_search_fields(app_name)
+        list_filter = self._get_list_filter(app_name)
+        model_name = self._get_model_name(app_name)
+
         with open(app_dir / "admin.py", "w") as file:
-            file.write(self._get_admin_template(app_name))
+            file.write(get_admin_template(
+                app_name,
+                model_name,
+                list_display,
+                search_fields,
+                list_filter,
+                is_main_app=(app_name == self.main_app)
+            ))
 
     def _create_templates_structure(self, app_name, is_main):
         """Create templates structure for the app."""
@@ -71,15 +99,15 @@ class AppTemplateCreator:
         templates_dir.mkdir(parents=True, exist_ok=True)
 
         if is_main:
-            # For main app, create index.html for homepage
             with open(templates_dir / "index.html", "w") as file:
-                file.write(self._get_main_index_template())
-        else:
-            # For other apps, create standard templates
-            with open(templates_dir / "index.html", "w") as file:
-                file.write(self._get_index_template(app_name))
+                file.write(get_main_index_template())
             with open(templates_dir / "about.html", "w") as file:
-                file.write(self._get_about_template(app_name))
+                file.write(get_about_template(app_name))
+        else:
+            with open(templates_dir / "index.html", "w") as file:
+                file.write(get_index_template(app_name))
+            with open(templates_dir / "about.html", "w") as file:
+                file.write(get_about_template(app_name))
 
     def _update_settings_with_apps(self):
         """Update settings.py to include the created apps."""
@@ -99,7 +127,7 @@ class AppTemplateCreator:
         with open(settings_path, "w") as file:
             file.writelines(content)
 
-    def _update_main_urls(self, main_app):
+    def _update_main_urls(self):
         """Update the main urls.py to include app URLs."""
         urls_path = self.base_dir / self.project_name / "urls.py"
         content = f"""from django.contrib import admin
@@ -108,12 +136,11 @@ from django.urls import path, include
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('__reload__/', include('django_browser_reload.urls')),
-    path('', include('{main_app}.urls')),  # Main app as homepage
+    path('', include('{self.main_app}.urls')),  # Main app as homepage
 """
-
         # Add other apps with their own URL prefixes
         for app in self.created_apps:
-            if app != main_app:
+            if app != self.main_app:
                 content += f'    path("{app}/", include("{app}.urls", namespace="{app}")),\n'
 
         content += "]\n"
@@ -121,205 +148,38 @@ urlpatterns = [
         with open(urls_path, "w") as file:
             file.write(content)
 
-    def _get_urls_template(self, app_name):
-        """Generate urls.py content for the app."""
-        return f'''from django.urls import path
-from . import views
+    def _get_model_name(self, app_name):
+        """Get the model name for an app."""
+        if app_name == "clients":
+            return "Client"
+        elif app_name == "orders":
+            return "Order"
+        else:
+            return f"{app_name.capitalize()}Item"
 
-app_name = "{app_name}"
+    def _get_list_display(self, app_name):
+        """Get list_display fields for admin."""
+        if app_name == "clients":
+            return '("first_name", "last_name", "email", "phone_number")'
+        elif app_name == "orders":
+            return '("client", "order_date", "delivery_date", "total_amount", "status")'
+        else:
+            return '("title", "created_at", "updated_at")'
 
-urlpatterns = [
-    path("", views.index, name="index"),
-    path("about/", views.about, name="about"),
-]
-'''
+    def _get_search_fields(self, app_name):
+        """Get search_fields for admin."""
+        if app_name == "clients":
+            return '("first_name", "last_name", "email")'
+        elif app_name == "orders":
+            return '("client__first_name", "client__last_name", "status")'
+        else:
+            return '("title", "description")'
 
-    def _get_views_template(self, app_name, is_main):
-        """Generate views.py content for the app."""
-        return f'''from django.shortcuts import render
-
-def index(request):
-    context = {{
-        "title": "Welcome to {self.project_name.capitalize()}" if {is_main} else "{app_name.capitalize()} Home",
-        "project_name": "{self.project_name}"
-    }}
-    return render(request, "{app_name}/index.html", context)
-
-def about(request):
-    context = {{
-        "title": "About {app_name.capitalize()}",
-        "project_name": "{self.project_name}"
-    }}
-    return render(request, "{app_name}/about.html", context)
-'''
-
-    def _get_models_template(self, app_name):
-        """Generate models.py content for the app."""
-        return f'''from django.db import models
-
-class {app_name.capitalize()}Item(models.Model):
-    title = models.CharField(max_length=200)
-    description = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return self.title
-
-    class Meta:
-        verbose_name = "{app_name.capitalize()} Item"
-        verbose_name_plural = "{app_name.capitalize()} Items"
-'''
-
-    def _get_admin_template(self, app_name):
-        """Generate admin.py content for the app."""
-        return f'''from django.contrib import admin
-from .models import {app_name.capitalize()}Item
-from unfold.admin import ModelAdmin
-
-# Unregister the model if already registered
-try:
-    admin.site.unregister({app_name.capitalize()}Item)
-except admin.sites.NotRegistered:
-    pass
-
-@admin.register({app_name.capitalize()}Item)
-class {app_name.capitalize()}ItemAdmin(ModelAdmin):
-    list_display = ("title", "created_at", "updated_at")
-    search_fields = ("title", "description")
-    list_filter = ("created_at", "updated_at")
-'''
-
-    def _get_main_index_template(self):
-        """Generate main index.html template for homepage."""
-        return '''{% extends "base.html" %}
-
-{% block title %}Welcome to {{ project_name|capfirst }}{% endblock %}
-
-{% block content %}
-<div class="max-w-4xl mx-auto">
-    <!-- Hero Section -->
-    <div class="bg-white rounded-lg shadow-md p-8 mb-8">
-        <h1 class="text-4xl font-bold text-gray-800 mb-4">Welcome to {{ project_name|capfirst }}</h1>
-        <p class="text-xl text-gray-600 mb-6">Your new Django project is ready to go!</p>
-        <div class="flex space-x-4">
-            <a href="/admin" class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors">
-                Admin Panel
-            </a>
-            <a href="#features" class="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors">
-                Learn More
-            </a>
-        </div>
-    </div>
-
-    <!-- Features Section -->
-    <div id="features" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <h2 class="text-xl font-semibold text-gray-800 mb-4">Django + Tailwind</h2>
-            <p class="text-gray-600">
-                Modern, responsive design powered by Django and Tailwind CSS.
-            </p>
-        </div>
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <h2 class="text-xl font-semibold text-gray-800 mb-4">Ready to Scale</h2>
-            <p class="text-gray-600">
-                Built with best practices and scalability in mind.
-            </p>
-        </div>
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <h2 class="text-xl font-semibold text-gray-800 mb-4">Developer Friendly</h2>
-            <p class="text-gray-600">
-                Hot-reloading, clean structure, and easy to customize.
-            </p>
-        </div>
-    </div>
-
-    <!-- CTA Section -->
-    <div class="bg-blue-50 rounded-lg shadow-md p-8 text-center">
-        <h2 class="text-2xl font-bold text-gray-800 mb-4">Start Building Today</h2>
-        <p class="text-gray-600 mb-6">
-            Everything you need to create your next amazing project.
-        </p>
-        <div class="space-x-4">
-            <a href="https://docs.djangoproject.com/" class="text-blue-500 hover:text-blue-600 transition-colors">
-                Django Docs
-            </a>
-            <span class="text-gray-400">|</span>
-            <a href="https://tailwindcss.com/docs" class="text-blue-500 hover:text-blue-600 transition-colors">
-                Tailwind Docs
-            </a>
-        </div>
-    </div>
-</div>
-{% endblock %}'''
-
-    def _get_index_template(self, app_name):
-        """Generate index.html template for regular apps."""
-        return '''{% extends "base.html" %}
-
-{% block title %}{{ app_name|capfirst }} Home{% endblock %}
-
-{% block content %}
-<div class="bg-white shadow-md rounded-lg p-6">
-    <h1 class="text-3xl font-bold text-gray-800 mb-4">{{ app_name|capfirst }}</h1>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="bg-blue-50 p-4 rounded-lg">
-            <h2 class="text-xl font-semibold text-blue-800 mb-2">Features</h2>
-            <ul class="list-disc list-inside text-blue-600">
-                <li>Feature 1</li>
-                <li>Feature 2</li>
-                <li>Feature 3</li>
-            </ul>
-        </div>
-
-        <div class="bg-green-50 p-4 rounded-lg">
-            <h2 class="text-xl font-semibold text-green-800 mb-2">Statistics</h2>
-            <ul class="list-disc list-inside text-green-600">
-                <li>Stat 1</li>
-                <li>Stat 2</li>
-                <li>Stat 3</li>
-            </ul>
-        </div>
-    </div>
-</div>
-{% endblock %}'''
-
-    def _get_about_template(self, app_name):
-        """Generate about.html template."""
-        return '''{% extends "base.html" %}
-
-{% block title %}About {{ app_name|capfirst }}{% endblock %}
-
-{% block content %}
-<div class="bg-white shadow-md rounded-lg p-6">
-    <h1 class="text-3xl font-bold text-gray-800 mb-4">About {{ app_name|capfirst }}</h1>
-
-    <div class="space-y-6">
-        <div class="bg-gray-50 p-4 rounded-lg">
-            <h2 class="text-xl font-semibold text-gray-800 mb-2">Our Mission</h2>
-            <p class="text-gray-600">
-                This is a sample about page for the {{ app_name }} application.
-                Replace this content with your actual mission statement.
-            </p>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="bg-blue-50 p-4 rounded-lg">
-                <h3 class="text-lg font-semibold text-blue-800 mb-2">Section 1</h3>
-                <p class="text-blue-600">Content for section 1</p>
-            </div>
-
-            <div class="bg-green-50 p-4 rounded-lg">
-                <h3 class="text-lg font-semibold text-green-800 mb-2">Section 2</h3>
-                <p class="text-green-600">Content for section 2</p>
-            </div>
-
-            <div class="bg-purple-50 p-4 rounded-lg">
-                <h3 class="text-lg font-semibold text-purple-800 mb-2">Section 3</h3>
-                <p class="text-purple-600">Content for section 3</p>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}'''
+    def _get_list_filter(self, app_name):
+        """Get list_filter fields for admin."""
+        if app_name == "clients":
+            return '("email",)'
+        elif app_name == "orders":
+            return '("order_date", "status")'
+        else:
+            return '("created_at", "updated_at")'

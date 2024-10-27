@@ -1,5 +1,3 @@
-# File: django_starter/templates/base_template_creator.py
-
 from pathlib import Path
 
 class BaseTemplateCreator:
