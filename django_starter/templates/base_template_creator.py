@@ -36,60 +36,56 @@ class BaseTemplateCreator:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Title{% endblock %}</title>
+    <title>{% block title %}''' + self.project_name.capitalize() + '''{% endblock %}</title>
     {% tailwind_css %}
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col">
-    <header class="bg-blue-600 text-white shadow-lg">
-        <nav class="container mx-auto px-4 py-4">
-            <div class="flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
-                <div class="flex justify-between items-center">
-                    <a href="/" class="text-2xl font-bold hover:text-blue-200 transition-colors">''' + self.project_name + '''</a>
-                    <button id="mobile-menu-button" class="md:hidden p-2 rounded hover:bg-blue-700 transition-colors">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                        </svg>
-                    </button>
-                </div>
-                <ul id="navbar-items" class="hidden md:flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-8">
-                    {% include "partials/_navbar.html" %}
-                </ul>
-            </div>
-        </nav>
+    <header class="bg-white shadow-lg">
+        {% include "partials/_navbar.html" %}
     </header>
 
     <main class="container mx-auto px-4 py-8 flex-grow">
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="bg-blue-600 text-white mt-auto">
+    <footer class="bg-gray-800 text-white mt-auto">
         <div class="container mx-auto px-4 py-6">
             <div class="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-                <p>&copy; {% now "Y" %} ''' + self.project_name + '''. All rights reserved.</p>
-                <ul class="flex space-x-6">
-                    {% block footer_navigation %}
-                    <li><a href="/" class="hover:text-blue-200 transition-colors">Home</a></li>
-                    {% endblock %}
-                </ul>
+                <p>&copy; {% now "Y" %} ''' + self.project_name.capitalize() + '''. All rights reserved.</p>
+                <div class="flex space-x-6">
+                    <a href="#" class="hover:text-gray-300 transition-colors">Privacy Policy</a>
+                    <a href="#" class="hover:text-gray-300 transition-colors">Terms of Service</a>
+                    <a href="#" class="hover:text-gray-300 transition-colors">Contact</a>
+                </div>
             </div>
         </div>
     </footer>
-
-    <script>
-        document.getElementById("mobile-menu-button").addEventListener("click", function() {
-            const navItems = document.getElementById("navbar-items");
-            navItems.classList.toggle("hidden");
-        });
-    </script>
 </body>
 </html>'''
 
     def _get_navbar_template(self):
         """Return the content for _navbar.html template."""
-        return '''{% block navigation %}
-<li><a href="/" class="block hover:text-blue-200 transition-colors">Home</a></li>
-{% for app in apps %}
-<li><a href="{% url "{{ app }}:index" %}" class="block hover:text-blue-200 transition-colors">{{ app|title }}</a></li>
-<li><a href="{% url "{{ app }}:about" %}" class="block hover:text-blue-200 transition-colors">About {{ app|title }}</a></li>
-{% endfor %}
-{% endblock %}'''
+        return '''<nav class="container mx-auto px-4 py-4">
+    <div class="flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
+        <div class="flex justify-between items-center">
+            <a href="/" class="text-2xl font-bold text-gray-800 hover:text-gray-600 transition-colors">''' + self.project_name.capitalize() + '''</a>
+            <button id="mobile-menu-button" class="md:hidden p-2 rounded hover:bg-gray-100 transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+            </button>
+        </div>
+        <ul id="navbar-items" class="hidden md:flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-8">
+            <li><a href="/" class="text-gray-600 hover:text-gray-800 transition-colors">Home</a></li>
+            {% block navigation %}
+            {% endblock %}
+        </ul>
+    </div>
+</nav>
+
+<script>
+    document.getElementById('mobile-menu-button').addEventListener('click', function() {
+        const navItems = document.getElementById('navbar-items');
+        navItems.classList.toggle('hidden');
+    });
+</script>'''

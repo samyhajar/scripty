@@ -13,11 +13,27 @@ class TailwindInstaller:
     def install(self):
         """Main installation method."""
         try:
+            # 1. Install packages
             self.install_tailwind_package()
-            self.update_settings()
+
+            # 2. Update initial settings with just tailwind
+            self.update_initial_settings()
+
+            # 3. Initialize tailwind app
             self.initialize_tailwind()
-            self.install_browser_reload()
+
+            # 4. Update settings with theme and browser reload
+            self.update_final_settings()
+
+            # 5. Run migrations
+            self._run_migrations()
+
+            # 6. Install tailwind dependencies
             self.install_dependencies()
+
+            # 7. Build Tailwind CSS
+            self.build_tailwind_css()
+
             print("\nTailwind CSS has been successfully installed and configured!")
         except Exception as e:
             raise Exception(f"Tailwind setup failed: {str(e)}")
@@ -27,28 +43,31 @@ class TailwindInstaller:
         print("\nInstalling Django Tailwind...")
         subprocess.run(
             [sys.executable, "-m", "pip", "install", "django-tailwind[reload]"],
-            check=True
+            check=True,
         )
         print("Django Tailwind installed successfully!")
 
-    def update_settings(self):
-        """Update Django settings for Tailwind."""
+    def update_initial_settings(self):
+        """Add initial Tailwind configuration to settings."""
         with open(self.settings_path, "r") as file:
             content = file.readlines()
 
         self._add_import_os(content)
-        self._add_tailwind_apps(content)
-        self._add_tailwind_config(content)
-        self._update_middleware(content)
-        self._update_templates(content)
+
+        # Add only tailwind to INSTALLED_APPS initially
+        for i, line in enumerate(content):
+            if "INSTALLED_APPS = [" in line:
+                insert_index = i + 1
+                content.insert(insert_index, "    'tailwind',\n")
+                break
 
         with open(self.settings_path, "w") as file:
             file.writelines(content)
-        print("Updated settings configuration")
+        print("Updated initial settings")
 
     def initialize_tailwind(self):
-        """Initialize Tailwind theme app."""
-        print("\nInitializing Tailwind...")
+        """Initialize Tailwind with theme app."""
+        print("\nInitializing Tailwind theme...")
         process = subprocess.Popen(
             [sys.executable, "manage.py", "tailwind", "init"],
             stdin=subprocess.PIPE,
@@ -59,72 +78,85 @@ class TailwindInstaller:
         stdout, stderr = process.communicate(input="theme\n")
 
         if process.returncode != 0:
-            raise Exception(f"Tailwind initialization failed: {stderr}")
-        print("Tailwind theme app created successfully!")
+            raise Exception(f"Failed to initialize Tailwind: {stderr}")
+        print("Tailwind theme initialized successfully!")
 
-    def install_browser_reload(self):
-        """Install django-browser-reload package."""
-        print("\nInstalling django-browser-reload...")
-        subprocess.run(
-            [sys.executable, "-m", "pip", "install", "django-browser-reload"],
-            check=True
-        )
-        print("Browser reload installed successfully!")
+    def update_final_settings(self):
+        """Update settings after theme creation."""
+        with open(self.settings_path, "r") as file:
+            content = file.readlines()
 
-    def install_dependencies(self):
-        """Install Tailwind dependencies."""
-        print("\nInstalling Tailwind dependencies...")
-        subprocess.run(
-            [sys.executable, "manage.py", "tailwind", "install"],
-            check=True
-        )
-        print("Tailwind dependencies installed successfully!")
-
-    # Private helper methods
-    def _add_import_os(self, content):
-        """Add OS import if not present."""
-        if "import os" not in content[0]:
-            content.insert(0, "import os\n")
-
-    def _add_tailwind_apps(self, content):
-        """Add Tailwind apps to INSTALLED_APPS."""
+        # Add theme and browser reload to INSTALLED_APPS
         for i, line in enumerate(content):
             if "INSTALLED_APPS = [" in line:
-                insert_index = i
-                while "]" not in content[insert_index]:
-                    insert_index += 1
-                content.insert(insert_index, "    'tailwind',\n")
+                insert_index = i + 1
                 content.insert(insert_index, "    'theme',\n")
                 content.insert(insert_index, "    'django_browser_reload',\n")
                 break
 
-    def _add_tailwind_config(self, content):
-        """Add Tailwind configuration settings."""
-        content.append("\n# Tailwind configuration\n")
-        content.append("TAILWIND_APP_NAME = 'theme'\n")
-        content.append("\nINTERNAL_IPS = [\n")
-        content.append('    "127.0.0.1",\n')
-        content.append("]\n")
-
-    def _update_middleware(self, content):
-        """Add browser reload middleware."""
+        # Add browser reload middleware
         for i, line in enumerate(content):
             if "MIDDLEWARE = [" in line:
                 content.insert(
                     i + 1,
-                    '    "django_browser_reload.middleware.BrowserReloadMiddleware",\n'
+                    '    "django_browser_reload.middleware.BrowserReloadMiddleware",\n',
                 )
                 break
 
-    def _update_templates(self, content):
-        """Ensure APP_DIRS is True in templates."""
-        for i, line in enumerate(content):
-            if "TEMPLATES = [" in line:
-                insert_index = i
-                while "]" not in content[insert_index]:
-                    insert_index += 1
-                    if "'APP_DIRS': True," in content[insert_index]:
-                        break
-                else:
-                    content.insert(insert_index, "        'APP_DIRS': True,\n")
-                break
+        # Add Tailwind and IP configuration
+        content.extend(
+            [
+                "\n# Tailwind configuration\n",
+                "TAILWIND_APP_NAME = 'theme'\n",
+                "\nINTERNAL_IPS = [\n",
+                '    "127.0.0.1",\n',
+                "]\n",
+            ]
+        )
+
+        with open(self.settings_path, "w") as file:
+            file.writelines(content)
+
+        # Update urls.py
+        self._update_urls()
+        print("Updated final settings")
+
+    def _update_urls(self):
+        """Add browser reload URLs."""
+        urls_path = self.base_dir / self.project_name / "urls.py"
+        with open(urls_path, "r") as file:
+            content = file.read()
+
+        if "django_browser_reload" not in content:
+            new_content = content.replace(
+                "from django.urls import path", "from django.urls import path, include"
+            )
+            new_content = new_content.replace(
+                "]\n",
+                '    path("__reload__/", include("django_browser_reload.urls")),\n]\n',
+            )
+
+            with open(urls_path, "w") as file:
+                file.write(new_content)
+
+    def install_dependencies(self):
+        """Install Tailwind dependencies."""
+        print("\nInstalling Tailwind dependencies...")
+        subprocess.run([sys.executable, "manage.py", "tailwind", "install"], check=True)
+        print("Tailwind dependencies installed successfully!")
+
+    def build_tailwind_css(self):
+        """Build Tailwind CSS assets."""
+        print("\nBuilding Tailwind CSS assets...")
+        subprocess.run([sys.executable, "manage.py", "tailwind", "build"], check=True)
+        print("Tailwind CSS assets built successfully!")
+
+    def _run_migrations(self):
+        """Run Django migrations."""
+        print("\nRunning migrations...")
+        subprocess.run([sys.executable, "manage.py", "migrate"], check=True)
+
+    def _add_import_os(self, content):
+        """Add OS import if not present."""
+        if not any("import os" in line for line in content):
+            content.insert(0, "import os\n")

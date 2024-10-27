@@ -1,5 +1,6 @@
 # File: django_starter/utils/messages.py
 
+
 class Messages:
     WELCOME_MESSAGE = """
 ╔══════════════════════════════════════════╗

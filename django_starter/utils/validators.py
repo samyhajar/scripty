@@ -1,5 +1,6 @@
 # File: django_starter/utils/validators.py
 
+
 class Validators:
     @staticmethod
     def is_valid_identifier(name):
