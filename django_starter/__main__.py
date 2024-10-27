@@ -6,6 +6,7 @@ from . import (
     BaseInstaller,
     DjangoInstaller,
     TailwindInstaller,
+    UnfoldInstaller,  # Import the UnfoldInstaller
     BaseTemplateCreator,
     AppTemplateCreator,
 )
@@ -42,6 +43,10 @@ def main():
         # Create main app and additional apps
         app_creator = AppTemplateCreator(project_name)
         created_apps = app_creator.create_apps(main_app=app_name)
+
+        # Install and configure Unfold
+        unfold_installer = UnfoldInstaller(project_name, app_name)  # Pass both project_name and app_name
+        unfold_installer.install()
 
         # Set up URL routing
         django_installer.configure_main_app_routing(app_name)

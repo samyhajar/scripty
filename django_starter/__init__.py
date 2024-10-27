@@ -3,6 +3,7 @@
 from .core.base_installer import BaseInstaller
 from .core.django_installer import DjangoInstaller
 from .core.tailwind_installer import TailwindInstaller
+from .core.unfold_installer import UnfoldInstaller
 from .templates.base_template_creator import BaseTemplateCreator
 from .templates.app_template_creator import AppTemplateCreator
 
