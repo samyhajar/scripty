@@ -175,9 +175,16 @@ class {app_name.capitalize()}Item(models.Model):
         """Generate admin.py content for the app."""
         return f'''from django.contrib import admin
 from .models import {app_name.capitalize()}Item
+from unfold.admin import ModelAdmin
+
+# Unregister the model if already registered
+try:
+    admin.site.unregister({app_name.capitalize()}Item)
+except admin.sites.NotRegistered:
+    pass
 
 @admin.register({app_name.capitalize()}Item)
-class {app_name.capitalize()}ItemAdmin(admin.ModelAdmin):
+class {app_name.capitalize()}ItemAdmin(ModelAdmin):
     list_display = ("title", "created_at", "updated_at")
     search_fields = ("title", "description")
     list_filter = ("created_at", "updated_at")
